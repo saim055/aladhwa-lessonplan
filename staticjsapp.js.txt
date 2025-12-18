@@ -1,0 +1,123 @@
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('lessonForm');
+    const dateInput = document.getElementById('date');
+    const valueInput = document.getElementById('value');
+    const loadingDiv = document.getElementById('loading');
+    const resultDiv = document.getElementById('result');
+    const progressText = document.getElementById('progress-text');
+
+    // Auto-fill value based on date
+    dateInput.addEventListener('change', async function() {
+        const selectedDate = this.value;
+        if (!selectedDate) return;
+
+        try {
+            const response = await fetch('/api/get-month-value', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ date: selectedDate })
+            });
+
+            const data = await response.json();
+            if (data.value) {
+                valueInput.value = data.value;
+            }
+        } catch (error) {
+            console.error('Error fetching month value:', error);
+        }
+    });
+
+    // Form submission
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        // Get form data
+        const formData = new FormData(form);
+        const data = {
+            date: formData.get('date'),
+            semester: formData.get('semester'),
+            grade: formData.get('grade'),
+            subject: formData.get('subject'),
+            topic: formData.get('topic'),
+            period: formData.get('period'),
+            value: formData.get('value'),
+            standards: formData.getAll('standards'),
+            digital_platform: formData.get('digital_platform'),
+            gifted_talented: formData.get('gifted_talented') === 'on',
+            ppt_style: formData.get('ppt_style')
+        };
+
+        // Show loading
+        form.classList.add('hidden');
+        loadingDiv.classList.remove('hidden');
+        
+        // Simulate progress
+        const progressSteps = [
+            'Analyzing lesson parameters...',
+            'Generating HOT objectives...',
+            'Creating starter activity...',
+            'Developing differentiated tasks...',
+            'Integrating UAE/ADEK framework...',
+            'Creating worksheets and rubrics...',
+            'Building PowerPoint presentation...',
+            'Packaging files...'
+        ];
+        
+        let stepIndex = 0;
+        const progressInterval = setInterval(() => {
+            if (stepIndex < progressSteps.length) {
+                progressText.textContent = progressSteps[stepIndex];
+                stepIndex++;
+            }
+        }, 15000);
+
+        try {
+            const response = await fetch('/api/generate-lesson-plan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            clearInterval(progressInterval);
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                // Show results
+                loadingDiv.classList.add('hidden');
+                resultDiv.classList.remove('hidden');
+
+                // Update file list
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = `
+                    <li>Complete Lesson Plan (Word Document)</li>
+                    <li>Differentiated Worksheets (DOK 1-4)</li>
+                    <li>Assessment Rubrics</li>
+                    <li>Question Bank</li>
+                    <li>PowerPoint Presentation</li>
+                `;
+
+                // Update download button
+                const downloadBtn = document.getElementById('downloadBtn');
+                downloadBtn.href = result.download_url;
+            } else {
+                throw new Error(result.message || 'Generation failed');
+            }
+        } catch (error) {
+            clearInterval(progressInterval);
+            alert('Error: ' + error.message);
+            loadingDiv.classList.add('hidden');
+            form.classList.remove('hidden');
+        }
+    });
+
+    // New plan button
+    document.getElementById('newPlanBtn').addEventListener('click', function() {
+        resultDiv.classList.add('hidden');
+        form.classList.remove('hidden');
+        form.reset();
+    });
+});
